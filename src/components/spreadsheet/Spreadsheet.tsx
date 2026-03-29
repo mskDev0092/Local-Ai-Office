@@ -15,7 +15,6 @@ import {
   FunctionSquare,
   Sparkles,
   Loader2,
-  X,
   MessageSquare,
 } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
