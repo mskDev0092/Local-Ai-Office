@@ -1,14 +1,14 @@
-import { useEffect } from 'react';
-import { useAppStore } from '@/store/appStore';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { RichTextEditor } from '@/components/editor/RichTextEditor';
-import { Spreadsheet } from '@/components/spreadsheet/Spreadsheet';
-import { AIAssistantPanel } from '@/components/ai/AIAssistantPanel';
-import { WelcomeView } from '@/components/WelcomeView';
-import { AIService } from '@/services/aiService';
-import { cn } from '@/lib/utils';
-import { Toaster } from '@/components/ui/sonner';
-import { toast } from 'sonner';
+import { useEffect } from "react";
+import { useAppStore } from "@/store/appStore";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { RichTextEditor } from "@/components/editor/RichTextEditor";
+import { Spreadsheet } from "@/components/spreadsheet/Spreadsheet";
+import { AIAssistantPanel } from "@/components/ai/AIAssistantPanel";
+import { WelcomeView } from "@/components/WelcomeView";
+import { AIService } from "@/services/aiService";
+import { cn } from "@/lib/utils";
+import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 function App() {
   const {
@@ -24,16 +24,21 @@ function App() {
   // Auto-detect AI on first load
   useEffect(() => {
     if (!aiConfig.isConnected && !aiConfig.provider) {
-      AIService.autoDetect().then((config) => {
-        if (config) {
-          setAIConfig(config);
-          toast.success(`Connected to ${config.provider === 'lmstudio' ? 'LM Studio' : 'Ollama'}`, {
-            description: `Model: ${config.model}`,
-          });
-        }
-      }).catch(() => {
-        // Silent fail - user can manually configure
-      });
+      AIService.autoDetect()
+        .then((config) => {
+          if (config) {
+            setAIConfig(config);
+            toast.success(
+              `Connected to ${config.provider === "lmstudio" ? "LM Studio" : "Ollama"}`,
+              {
+                description: `Model: ${config.model}`,
+              },
+            );
+          }
+        })
+        .catch(() => {
+          // Silent fail - user can manually configure
+        });
     }
   }, []);
 
@@ -41,7 +46,7 @@ function App() {
   useEffect(() => {
     if (files.length === 0) {
       const { createFile } = useAppStore.getState();
-      const id = createFile('Welcome Document', 'document');
+      const id = createFile("Welcome Document", "document");
       const { updateDocument, setCurrentFile } = useAppStore.getState();
       updateDocument(
         id,
@@ -62,7 +67,7 @@ function App() {
 <p>The app will auto-detect your AI provider. You can also configure it manually in Settings.</p>
 <h2>Privacy First</h2>
 <p>All your data stays on your device. No cloud, no tracking, no data sharing.</p>
-<p>Start creating by clicking "New File" in the sidebar!</p>`
+<p>Start creating by clicking "New File" in the sidebar!</p>`,
       );
       setCurrentFile(id);
     }
@@ -70,17 +75,17 @@ function App() {
 
   const renderContent = () => {
     switch (view) {
-      case 'editor':
+      case "editor":
         if (currentFileId) {
           return <RichTextEditor fileId={currentFileId} />;
         }
         return <WelcomeView />;
-      case 'spreadsheet':
+      case "spreadsheet":
         if (currentFileId) {
           return <Spreadsheet fileId={currentFileId} />;
         }
         return <WelcomeView />;
-      case 'welcome':
+      case "welcome":
       default:
         return <WelcomeView />;
     }
@@ -94,8 +99,8 @@ function App() {
       {/* Main Content Area */}
       <main
         className={cn(
-          'flex-1 flex flex-col transition-all duration-300',
-          sidebarOpen ? 'lg:ml-64' : 'ml-0'
+          "flex-1 flex flex-col transition-all duration-300",
+          sidebarOpen ? "lg:ml-64" : "ml-0",
         )}
       >
         {/* Top Bar */}
@@ -103,7 +108,7 @@ function App() {
           <div className="flex items-center gap-4">
             {currentFileId && (
               <span className="text-sm text-gray-500">
-                {files.find((f) => f.id === currentFileId)?.name || 'Untitled'}
+                {files.find((f) => f.id === currentFileId)?.name || "Untitled"}
               </span>
             )}
           </div>
@@ -123,8 +128,10 @@ function App() {
         </header>
 
         {/* Content */}
-        <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 overflow-hidden">{renderContent()}</div>
+        <div className="flex-1 flex gap-0 overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+            {renderContent()}
+          </div>
           {aiPanelOpen && <AIAssistantPanel />}
         </div>
       </main>

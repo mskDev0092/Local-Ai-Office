@@ -1,7 +1,7 @@
 export interface Document {
   id: string;
   name: string;
-  type: 'document' | 'spreadsheet';
+  type: "document" | "spreadsheet";
   content: string;
   createdAt: number;
   updatedAt: number;
@@ -18,7 +18,7 @@ export interface CellStyle {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
-  align?: 'left' | 'center' | 'right';
+  align?: "left" | "center" | "right";
   backgroundColor?: string;
   textColor?: string;
   fontSize?: number;
@@ -30,10 +30,11 @@ export interface SpreadsheetData {
   colCount: number;
   colWidths: Record<number, number>;
   rowHeights: Record<number, number>;
+  lastUsedFormula?: string;
 }
 
 export interface AIConfig {
-  provider: 'lmstudio' | 'ollama' | null;
+  provider: "lmstudio" | "ollama" | null;
   baseUrl: string;
   model: string;
   isConnected: boolean;
@@ -41,7 +42,7 @@ export interface AIConfig {
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   timestamp: number;
 }
@@ -49,15 +50,15 @@ export interface ChatMessage {
 export interface AIRequest {
   prompt: string;
   context?: string;
-  action: 'write' | 'edit' | 'format' | 'summarize' | 'explain' | 'chat';
+  action: "write" | "edit" | "format" | "summarize" | "explain" | "chat";
 }
 
-export type ViewType = 'editor' | 'spreadsheet' | 'welcome';
+export type ViewType = "editor" | "spreadsheet" | "welcome";
 
 export interface FileItem {
   id: string;
   name: string;
-  type: 'document' | 'spreadsheet' | 'folder';
+  type: "document" | "spreadsheet" | "folder";
   parentId: string | null;
   createdAt: number;
   updatedAt: number;

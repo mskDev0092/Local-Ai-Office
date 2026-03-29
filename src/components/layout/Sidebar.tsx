@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { 
-  FileText, 
-  Table2, 
-  Plus, 
-  Folder, 
-  ChevronRight, 
+import { useState } from "react";
+import {
+  FileText,
+  Table2,
+  Plus,
+  Folder,
+  ChevronRight,
   ChevronDown,
   MoreVertical,
   Trash2,
@@ -14,35 +14,35 @@ import {
   Cpu,
   Settings,
   Menu,
-  X
-} from 'lucide-react';
-import { useAppStore } from '@/store/appStore';
-import type { FileItem } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+  X,
+} from "lucide-react";
+import { useAppStore } from "@/store/appStore";
+import type { FileItem } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 export function Sidebar() {
-  const { 
-    files, 
-    currentFileId, 
-    sidebarOpen, 
-    setCurrentFile, 
-    createFile, 
-    deleteFile, 
+  const {
+    files,
+    currentFileId,
+    sidebarOpen,
+    setCurrentFile,
+    createFile,
+    deleteFile,
     updateFile,
     toggleSidebar,
     setView,
@@ -50,12 +50,16 @@ export function Sidebar() {
     aiConfig,
   } = useAppStore();
 
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
+    new Set(),
+  );
   const [renamingFile, setRenamingFile] = useState<string | null>(null);
-  const [newName, setNewName] = useState('');
+  const [newName, setNewName] = useState("");
   const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
-  const [newFileType, setNewFileType] = useState<'document' | 'spreadsheet'>('document');
-  const [newFileName, setNewFileName] = useState('');
+  const [newFileType, setNewFileType] = useState<"document" | "spreadsheet">(
+    "document",
+  );
+  const [newFileName, setNewFileName] = useState("");
 
   const toggleFolder = (folderId: string) => {
     setExpandedFolders((prev) => {
@@ -73,7 +77,7 @@ export function Sidebar() {
     if (newFileName.trim()) {
       const id = createFile(newFileName.trim(), newFileType);
       setCurrentFile(id);
-      setNewFileName('');
+      setNewFileName("");
       setNewFileDialogOpen(false);
     }
   };
@@ -82,7 +86,7 @@ export function Sidebar() {
     if (newName.trim()) {
       updateFile(fileId, { name: newName.trim() });
       setRenamingFile(null);
-      setNewName('');
+      setNewName("");
     }
   };
 
@@ -95,20 +99,24 @@ export function Sidebar() {
     const items = files.filter((f) => f.parentId === parentId);
 
     return items.map((file) => {
-      const isFolder = file.type === 'folder';
+      const isFolder = file.type === "folder";
       const isExpanded = expandedFolders.has(file.id);
       const isSelected = currentFileId === file.id;
-      const Icon = isFolder ? Folder : file.type === 'document' ? FileText : Table2;
+      const Icon = isFolder
+        ? Folder
+        : file.type === "document"
+          ? FileText
+          : Table2;
 
       return (
         <div key={file.id}>
           <div
             className={cn(
-              'group flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer transition-colors',
-              isSelected 
-                ? 'bg-[#0564d2]/10 text-[#0564d2]' 
-                : 'hover:bg-gray-100 text-gray-700',
-              depth > 0 && 'ml-4'
+              "group flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer transition-colors",
+              isSelected
+                ? "bg-[#0564d2]/10 text-[#0564d2]"
+                : "hover:bg-gray-100 text-gray-700",
+              depth > 0 && "ml-4",
             )}
             style={{ paddingLeft: `${8 + depth * 12}px` }}
             onClick={() => {
@@ -129,22 +137,24 @@ export function Sidebar() {
               </span>
             )}
             {!isFolder && <span className="w-4" />}
-            
-            <Icon className={cn(
-              'w-4 h-4 flex-shrink-0',
-              isFolder && 'text-amber-500'
-            )} />
-            
+
+            <Icon
+              className={cn(
+                "w-4 h-4 flex-shrink-0",
+                isFolder && "text-amber-500",
+              )}
+            />
+
             {renamingFile === file.id ? (
               <Input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onBlur={() => handleRename(file.id)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleRename(file.id);
-                  if (e.key === 'Escape') {
+                  if (e.key === "Enter") handleRename(file.id);
+                  if (e.key === "Escape") {
                     setRenamingFile(null);
-                    setNewName('');
+                    setNewName("");
                   }
                 }}
                 onClick={(e) => e.stopPropagation()}
@@ -171,7 +181,7 @@ export function Sidebar() {
                   <Edit2 className="w-4 h-4 mr-2" />
                   Rename
                 </DropdownMenuItem>
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={() => deleteFile(file.id)}
                   className="text-red-600"
                 >
@@ -181,7 +191,7 @@ export function Sidebar() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          
+
           {isFolder && isExpanded && renderFileTree(file.id, depth + 1)}
         </div>
       );
@@ -203,19 +213,25 @@ export function Sidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-0 h-full bg-white border-r border-gray-200 transition-all duration-300 z-40',
-          sidebarOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full lg:translate-x-0 lg:w-0 lg:opacity-0'
+          "fixed left-0 top-0 h-full bg-white border-r border-gray-200 transition-all duration-300 z-40",
+          sidebarOpen
+            ? "w-64 translate-x-0"
+            : "w-64 -translate-x-full lg:translate-x-0 lg:w-0 lg:opacity-0",
         )}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <div className="flex items-center gap-2">
+            <button
+              onClick={() => setView("welcome")}
+              className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer"
+              title="Go to home screen"
+            >
               <div className="w-8 h-8 bg-gradient-to-br from-[#0564d2] to-[#0e2244] rounded-lg flex items-center justify-center">
                 <FileText className="w-4 h-4 text-white" />
               </div>
               <span className="font-semibold text-gray-900">AI Office</span>
-            </div>
+            </button>
             <Button
               variant="ghost"
               size="icon"
@@ -228,7 +244,10 @@ export function Sidebar() {
 
           {/* Actions */}
           <div className="p-3 space-y-2">
-            <Dialog open={newFileDialogOpen} onOpenChange={setNewFileDialogOpen}>
+            <Dialog
+              open={newFileDialogOpen}
+              onOpenChange={setNewFileDialogOpen}
+            >
               <DialogTrigger asChild>
                 <Button className="w-full justify-start gap-2 bg-[#0564d2] hover:bg-[#0558b9]">
                   <Plus className="w-4 h-4" />
@@ -242,23 +261,27 @@ export function Sidebar() {
                 <div className="space-y-4 pt-4">
                   <div className="flex gap-2">
                     <Button
-                      variant={newFileType === 'document' ? 'default' : 'outline'}
+                      variant={
+                        newFileType === "document" ? "default" : "outline"
+                      }
                       className={cn(
-                        'flex-1 gap-2',
-                        newFileType === 'document' && 'bg-[#0564d2]'
+                        "flex-1 gap-2",
+                        newFileType === "document" && "bg-[#0564d2]",
                       )}
-                      onClick={() => setNewFileType('document')}
+                      onClick={() => setNewFileType("document")}
                     >
                       <FilePlus className="w-4 h-4" />
                       Document
                     </Button>
                     <Button
-                      variant={newFileType === 'spreadsheet' ? 'default' : 'outline'}
+                      variant={
+                        newFileType === "spreadsheet" ? "default" : "outline"
+                      }
                       className={cn(
-                        'flex-1 gap-2',
-                        newFileType === 'spreadsheet' && 'bg-[#0564d2]'
+                        "flex-1 gap-2",
+                        newFileType === "spreadsheet" && "bg-[#0564d2]",
                       )}
-                      onClick={() => setNewFileType('spreadsheet')}
+                      onClick={() => setNewFileType("spreadsheet")}
                     >
                       <Table className="w-4 h-4" />
                       Spreadsheet
@@ -268,9 +291,9 @@ export function Sidebar() {
                     placeholder="File name"
                     value={newFileName}
                     onChange={(e) => setNewFileName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateFile()}
+                    onKeyDown={(e) => e.key === "Enter" && handleCreateFile()}
                   />
-                  <Button 
+                  <Button
                     className="w-full bg-[#0564d2] hover:bg-[#0558b9]"
                     onClick={handleCreateFile}
                     disabled={!newFileName.trim()}
@@ -286,13 +309,17 @@ export function Sidebar() {
               className="w-full justify-start gap-2"
               onClick={() => setAIPanelOpen(true)}
             >
-              <Cpu className={cn(
-                'w-4 h-4',
-                aiConfig.isConnected ? 'text-green-500' : 'text-gray-400'
-              )} />
+              <Cpu
+                className={cn(
+                  "w-4 h-4",
+                  aiConfig.isConnected ? "text-green-500" : "text-gray-400",
+                )}
+              />
               AI Assistant
               {aiConfig.isConnected && (
-                <span className="ml-auto text-xs text-green-600">Connected</span>
+                <span className="ml-auto text-xs text-green-600">
+                  Connected
+                </span>
               )}
             </Button>
           </div>
@@ -316,7 +343,7 @@ export function Sidebar() {
             <Button
               variant="ghost"
               className="w-full justify-start gap-2 text-gray-600"
-              onClick={() => setView('welcome')}
+              onClick={() => setView("welcome")}
             >
               <Settings className="w-4 h-4" />
               Settings

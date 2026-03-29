@@ -1,9 +1,9 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { useAppStore } from '@/store/appStore';
-import type { Cell } from '@/types';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useAppStore } from "@/store/appStore";
+import type { Cell } from "@/types";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Bold,
   Italic,
@@ -14,16 +14,29 @@ import {
   Plus,
   FunctionSquare,
   Sparkles,
-} from 'lucide-react';
-import { Toggle } from '@/components/ui/toggle';
-import { Separator } from '@/components/ui/separator';
+  Loader2,
+  X,
+  MessageSquare,
+} from "lucide-react";
+import { Toggle } from "@/components/ui/toggle";
+import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { AIService } from "@/services/aiService";
+import { toast } from "sonner";
 
 interface SpreadsheetProps {
   fileId: string;
 }
 
 const getColumnLabel = (index: number): string => {
-  let result = '';
+  let result = "";
   let n = index;
   do {
     result = String.fromCharCode(65 + (n % 26)) + result;
@@ -32,28 +45,34 @@ const getColumnLabel = (index: number): string => {
   return result;
 };
 
-const getCellId = (row: number, col: number): string => `${getColumnLabel(col)}${row + 1}`;
+const getCellId = (row: number, col: number): string =>
+  `${getColumnLabel(col)}${row + 1}`;
 
-const parseCellReference = (ref: string): { row: number; col: number } | null => {
+const parseCellReference = (
+  ref: string,
+): { row: number; col: number } | null => {
   const match = ref.match(/^([A-Z]+)(\d+)$/);
   if (!match) return null;
-  
+
   const colStr = match[1];
   const row = parseInt(match[2], 10) - 1;
-  
+
   let col = 0;
   for (let i = 0; i < colStr.length; i++) {
     col = col * 26 + (colStr.charCodeAt(i) - 65);
   }
-  
+
   return { row, col };
 };
 
-const evaluateFormula = (formula: string, cells: Record<string, Cell>): string => {
-  if (!formula.startsWith('=')) return formula;
-  
+const evaluateFormula = (
+  formula: string,
+  cells: Record<string, Cell>,
+): string => {
+  if (!formula.startsWith("=")) return formula;
+
   const expr = formula.slice(1).toUpperCase();
-  
+
   // Handle SUM function
   const sumMatch = expr.match(/SUM\(([A-Z]+\d+):([A-Z]+\d+)\)/);
   if (sumMatch) {
@@ -65,14 +84,14 @@ const evaluateFormula = (formula: string, cells: Record<string, Cell>): string =
         for (let c = start.col; c <= end.col; c++) {
           const cellId = getCellId(r, c);
           const cell = cells[cellId];
-          const value = parseFloat(cell?.value || '0');
+          const value = parseFloat(cell?.value || "0");
           if (!isNaN(value)) sum += value;
         }
       }
       return sum.toString();
     }
   }
-  
+
   // Handle AVERAGE function
   const avgMatch = expr.match(/AVERAGE\(([A-Z]+\d+):([A-Z]+\d+)\)/);
   if (avgMatch) {
@@ -85,25 +104,25 @@ const evaluateFormula = (formula: string, cells: Record<string, Cell>): string =
         for (let c = start.col; c <= end.col; c++) {
           const cellId = getCellId(r, c);
           const cell = cells[cellId];
-          const value = parseFloat(cell?.value || '0');
+          const value = parseFloat(cell?.value || "0");
           if (!isNaN(value)) {
             sum += value;
             count++;
           }
         }
       }
-      return count > 0 ? (sum / count).toString() : '0';
+      return count > 0 ? (sum / count).toString() : "0";
     }
   }
-  
+
   // Handle simple cell references
   const cellRef = parseCellReference(expr);
   if (cellRef) {
     const cellId = getCellId(cellRef.row, cellRef.col);
     const cell = cells[cellId];
-    return cell?.value || '';
+    return cell?.value || "";
   }
-  
+
   // Try to evaluate as simple math expression
   try {
     // Replace cell references with their values
@@ -112,21 +131,28 @@ const evaluateFormula = (formula: string, cells: Record<string, Cell>): string =
       if (ref) {
         const cellId = getCellId(ref.row, ref.col);
         const cell = cells[cellId];
-        return cell?.value || '0';
+        return cell?.value || "0";
       }
-      return '0';
+      return "0";
     });
-    
+
     // eslint-disable-next-line no-new-func
-    const result = new Function('return ' + sanitized)();
+    const result = new Function("return " + sanitized)();
     return result.toString();
   } catch {
-    return '#ERROR';
+    return "#ERROR";
   }
 };
 
 export function Spreadsheet({ fileId }: SpreadsheetProps) {
-  const { spreadsheets, updateSpreadsheet, aiConfig } = useAppStore();
+  const {
+    spreadsheets,
+    updateSpreadsheet,
+    aiConfig,
+    documents,
+    aiPanelOpen,
+    setAIPanelOpen,
+  } = useAppStore();
   const data = spreadsheets[fileId] || {
     cells: {},
     rowCount: 50,
@@ -137,7 +163,11 @@ export function Spreadsheet({ fileId }: SpreadsheetProps) {
 
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
+  const [editValue, setEditValue] = useState("");
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiResult, setAiResult] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -146,43 +176,52 @@ export function Spreadsheet({ fileId }: SpreadsheetProps) {
     }
   }, [editingCell]);
 
-  const getCell = useCallback((row: number, col: number): Cell => {
-    const cellId = getCellId(row, col);
-    return data.cells[cellId] || { value: '' };
-  }, [data.cells]);
+  const getCell = useCallback(
+    (row: number, col: number): Cell => {
+      const cellId = getCellId(row, col);
+      return data.cells[cellId] || { value: "" };
+    },
+    [data.cells],
+  );
 
-  const setCell = useCallback((row: number, col: number, updates: Partial<Cell>) => {
-    const cellId = getCellId(row, col);
-    const currentCell = data.cells[cellId] || { value: '' };
-    
-    const newCells = {
-      ...data.cells,
-      [cellId]: { ...currentCell, ...updates },
-    };
-    
-    updateSpreadsheet(fileId, {
-      ...data,
-      cells: newCells,
-    });
-  }, [data, fileId, updateSpreadsheet]);
+  const setCell = useCallback(
+    (row: number, col: number, updates: Partial<Cell>) => {
+      const cellId = getCellId(row, col);
+      const currentCell = data.cells[cellId] || { value: "" };
+
+      const newCells = {
+        ...data.cells,
+        [cellId]: { ...currentCell, ...updates },
+      };
+
+      updateSpreadsheet(fileId, {
+        ...data,
+        cells: newCells,
+      });
+    },
+    [data, fileId, updateSpreadsheet],
+  );
 
   const handleCellClick = useCallback((row: number, col: number) => {
     const cellId = getCellId(row, col);
     setSelectedCell(cellId);
   }, []);
 
-  const handleCellDoubleClick = useCallback((row: number, col: number) => {
-    const cellId = getCellId(row, col);
-    const cell = getCell(row, col);
-    setEditingCell(cellId);
-    setEditValue(cell.value);
-  }, [getCell]);
+  const handleCellDoubleClick = useCallback(
+    (row: number, col: number) => {
+      const cellId = getCellId(row, col);
+      const cell = getCell(row, col);
+      setEditingCell(cellId);
+      setEditValue(cell.value);
+    },
+    [getCell],
+  );
 
   const handleEditSubmit = useCallback(() => {
     if (editingCell) {
       const ref = parseCellReference(editingCell);
       if (ref) {
-        const isFormula = editValue.startsWith('=');
+        const isFormula = editValue.startsWith("=");
         setCell(ref.row, ref.col, {
           value: editValue,
           formula: isFormula ? editValue : undefined,
@@ -190,44 +229,58 @@ export function Spreadsheet({ fileId }: SpreadsheetProps) {
       }
     }
     setEditingCell(null);
-    setEditValue('');
+    setEditValue("");
   }, [editingCell, editValue, setCell]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent, row: number, col: number) => {
-    if (e.key === 'Enter') {
-      if (editingCell) {
-        handleEditSubmit();
-      } else {
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent, row: number, col: number) => {
+      if (e.key === "Enter") {
+        if (editingCell) {
+          handleEditSubmit();
+        } else {
+          handleCellDoubleClick(row, col);
+        }
+      } else if (e.key === "Escape" && editingCell) {
+        setEditingCell(null);
+        setEditValue("");
+      } else if (e.key === "ArrowUp" && !editingCell && row > 0) {
+        setSelectedCell(getCellId(row - 1, col));
+      } else if (e.key === "ArrowDown" && !editingCell) {
+        setSelectedCell(getCellId(row + 1, col));
+      } else if (e.key === "ArrowLeft" && !editingCell && col > 0) {
+        setSelectedCell(getCellId(row, col - 1));
+      } else if (e.key === "ArrowRight" && !editingCell) {
+        setSelectedCell(getCellId(row, col + 1));
+      } else if (e.ctrlKey && e.key === "v") {
+        e.preventDefault();
+        if (data.lastUsedFormula) {
+          setCell(row, col, {
+            value: data.lastUsedFormula,
+            formula: data.lastUsedFormula,
+          });
+        }
+      } else if (!editingCell && e.key.length === 1) {
         handleCellDoubleClick(row, col);
+        setEditValue(e.key);
       }
-    } else if (e.key === 'Escape' && editingCell) {
-      setEditingCell(null);
-      setEditValue('');
-    } else if (e.key === 'ArrowUp' && !editingCell && row > 0) {
-      setSelectedCell(getCellId(row - 1, col));
-    } else if (e.key === 'ArrowDown' && !editingCell) {
-      setSelectedCell(getCellId(row + 1, col));
-    } else if (e.key === 'ArrowLeft' && !editingCell && col > 0) {
-      setSelectedCell(getCellId(row, col - 1));
-    } else if (e.key === 'ArrowRight' && !editingCell) {
-      setSelectedCell(getCellId(row, col + 1));
-    } else if (!editingCell && e.key.length === 1) {
-      handleCellDoubleClick(row, col);
-      setEditValue(e.key);
-    }
-  }, [editingCell, handleCellDoubleClick, handleEditSubmit]);
+    },
+    [editingCell, handleCellDoubleClick, handleEditSubmit, data, setCell],
+  );
 
-  const applyStyle = useCallback((style: Partial<Cell['style']>) => {
-    if (!selectedCell) return;
-    
-    const ref = parseCellReference(selectedCell);
-    if (!ref) return;
-    
-    const cell = getCell(ref.row, ref.col);
-    setCell(ref.row, ref.col, {
-      style: { ...cell.style, ...style },
-    });
-  }, [selectedCell, getCell, setCell]);
+  const applyStyle = useCallback(
+    (style: Partial<Cell["style"]>) => {
+      if (!selectedCell) return;
+
+      const ref = parseCellReference(selectedCell);
+      if (!ref) return;
+
+      const cell = getCell(ref.row, ref.col);
+      setCell(ref.row, ref.col, {
+        style: { ...cell.style, ...style },
+      });
+    },
+    [selectedCell, getCell, setCell],
+  );
 
   const addRow = useCallback(() => {
     updateSpreadsheet(fileId, {
@@ -243,10 +296,83 @@ export function Spreadsheet({ fileId }: SpreadsheetProps) {
     });
   }, [data, fileId, updateSpreadsheet]);
 
-  const selectedCellData = selectedCell ? (() => {
+  const handleAIAssist = useCallback(async () => {
+    if (!aiPrompt.trim() || !aiConfig.isConnected) return;
+
+    setAiLoading(true);
+    try {
+      const aiService = new AIService(aiConfig);
+
+      // Build spreadsheet context
+      const cellSummary = Object.entries(data.cells)
+        .slice(0, 30)
+        .map(([id, cell]) => `${id}: ${cell.value || "(empty)"}`)
+        .join(", ");
+
+      const context = `
+Spreadsheet: ${documents[fileId]?.name || "Untitled"}
+Dimensions: ${data.rowCount} rows × ${data.colCount} columns
+Selected cell: ${selectedCell || "None"}
+Sample data: ${cellSummary}
+
+User request: ${aiPrompt}
+
+Provide a formula or solution for Excel/Spreadsheet. Format your response as: =FORMULA() or provide an explanation.`;
+
+      const messages = [
+        {
+          role: "system",
+          content:
+            "You are an expert spreadsheet assistant. Help users create formulas, analyze data, and solve spreadsheet problems. Provide formulas in Excel/Sheets format starting with =",
+        },
+        {
+          role: "user",
+          content: context,
+        },
+      ];
+
+      let response = "";
+      for await (const chunk of aiService.streamCompletion(messages)) {
+        response += chunk;
+      }
+
+      setAiResult(response);
+    } catch (error) {
+      setAiResult(
+        `Error: ${error instanceof Error ? error.message : "Failed to get AI response"}`,
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  }, [aiPrompt, aiConfig, data, selectedCell, documents, fileId]);
+
+  const applyAIFormula = useCallback(() => {
+    if (!selectedCell || !aiResult) return;
+
     const ref = parseCellReference(selectedCell);
-    return ref ? getCell(ref.row, ref.col) : null;
-  })() : null;
+    if (!ref) return;
+
+    // Extract formula from result (look for =...)
+    const formulaMatch = aiResult.match(/=[\w():\-+*/%,.\s]+/);
+    const formula = formulaMatch ? formulaMatch[0].trim() : aiResult;
+
+    setCell(ref.row, ref.col, {
+      value: formula,
+      formula: formula.startsWith("=") ? formula : undefined,
+    });
+
+    setAiDialogOpen(false);
+    setAiPrompt("");
+    setAiResult("");
+    toast.success("Formula applied");
+  }, [selectedCell, aiResult, setCell]);
+
+  const selectedCellData = selectedCell
+    ? (() => {
+        const ref = parseCellReference(selectedCell);
+        return ref ? getCell(ref.row, ref.col) : null;
+      })()
+    : null;
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -285,24 +411,24 @@ export function Spreadsheet({ fileId }: SpreadsheetProps) {
         {/* Alignment */}
         <div className="flex items-center gap-0.5">
           <Toggle
-            pressed={selectedCellData?.style?.align === 'left'}
-            onPressedChange={() => applyStyle({ align: 'left' })}
+            pressed={selectedCellData?.style?.align === "left"}
+            onPressedChange={() => applyStyle({ align: "left" })}
             className="h-8 w-8 p-0"
             title="Align Left"
           >
             <AlignLeft className="w-4 h-4" />
           </Toggle>
           <Toggle
-            pressed={selectedCellData?.style?.align === 'center'}
-            onPressedChange={() => applyStyle({ align: 'center' })}
+            pressed={selectedCellData?.style?.align === "center"}
+            onPressedChange={() => applyStyle({ align: "center" })}
             className="h-8 w-8 p-0"
             title="Align Center"
           >
             <AlignCenter className="w-4 h-4" />
           </Toggle>
           <Toggle
-            pressed={selectedCellData?.style?.align === 'right'}
-            onPressedChange={() => applyStyle({ align: 'right' })}
+            pressed={selectedCellData?.style?.align === "right"}
+            onPressedChange={() => applyStyle({ align: "right" })}
             className="h-8 w-8 p-0"
             title="Align Right"
           >
@@ -342,13 +468,19 @@ export function Spreadsheet({ fileId }: SpreadsheetProps) {
         <div className="flex items-center gap-2 flex-1">
           <FunctionSquare className="w-4 h-4 text-gray-400" />
           <Input
-            value={selectedCell ? (data.cells[selectedCell]?.formula || data.cells[selectedCell]?.value || '') : ''}
+            value={
+              selectedCell
+                ? data.cells[selectedCell]?.formula ||
+                  data.cells[selectedCell]?.value ||
+                  ""
+                : ""
+            }
             onChange={(e) => {
               if (selectedCell) {
                 const ref = parseCellReference(selectedCell);
                 if (ref) {
                   const value = e.target.value;
-                  const isFormula = value.startsWith('=');
+                  const isFormula = value.startsWith("=");
                   setCell(ref.row, ref.col, {
                     value,
                     formula: isFormula ? value : undefined,
@@ -362,28 +494,113 @@ export function Spreadsheet({ fileId }: SpreadsheetProps) {
         </div>
 
         {aiConfig.isConnected && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 text-[#0564d2]"
-          >
-            <Sparkles className="w-4 h-4 mr-1" />
-            AI
-          </Button>
+          <>
+            <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-[#0564d2]"
+                  title="Get AI help with formulas"
+                >
+                  <Sparkles className="w-4 h-4 mr-1" />
+                  AI
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>AI Formula Assistant</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  {selectedCell && (
+                    <div className="text-sm text-gray-600">
+                      Working on cell:{" "}
+                      <span className="font-mono bg-gray-100 px-2 py-1 rounded">
+                        {selectedCell}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="ai-prompt">What do you want to do?</Label>
+                    <input
+                      id="ai-prompt"
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      placeholder="e.g., Sum values in A1:A10, Calculate average of B column..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0564d2]"
+                    />
+                  </div>
+
+                  {aiResult && (
+                    <div className="space-y-2">
+                      <Label>AI Suggestion</Label>
+                      <div className="bg-gray-50 border border-gray-300 rounded-lg p-3 text-sm max-h-32 overflow-y-auto">
+                        <p className="whitespace-pre-wrap">{aiResult}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="w-full bg-green-600 hover:bg-green-700"
+                        onClick={applyAIFormula}
+                      >
+                        Apply Formula
+                      </Button>
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={handleAIAssist}
+                    disabled={!aiPrompt.trim() || aiLoading}
+                    className="w-full bg-[#0564d2] hover:bg-[#0558b9]"
+                  >
+                    {aiLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Get Suggestion
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-8 px-2 gap-1",
+                aiPanelOpen
+                  ? "text-[#0564d2] bg-[#0564d2]/10"
+                  : "text-gray-600 hover:text-[#0564d2] hover:bg-[#0564d2]/10",
+              )}
+              onClick={() => setAIPanelOpen(!aiPanelOpen)}
+              title={aiPanelOpen ? "Close AI chat" : "Open AI chat"}
+            >
+              <MessageSquare className="w-4 h-4" />
+              Chat
+            </Button>
+          </>
         )}
       </div>
 
       {/* Formula Bar */}
       <div className="flex items-center gap-2 px-4 py-1 border-b border-gray-200 bg-gray-50">
         <span className="text-sm font-medium text-gray-600 min-w-[60px]">
-          {selectedCell || ''}
+          {selectedCell || ""}
         </span>
         <span className="text-gray-300">|</span>
         <span className="text-sm text-gray-700 flex-1 truncate">
-          {selectedCell && evaluateFormula(
-            data.cells[selectedCell]?.formula || data.cells[selectedCell]?.value || '',
-            data.cells
-          )}
+          {selectedCell &&
+            evaluateFormula(
+              data.cells[selectedCell]?.formula ||
+                data.cells[selectedCell]?.value ||
+                "",
+              data.cells,
+            )}
         </span>
       </div>
 
@@ -425,13 +642,14 @@ export function Spreadsheet({ fileId }: SpreadsheetProps) {
                   <div
                     key={cellId}
                     className={cn(
-                      'w-24 h-7 border-r border-b border-gray-200 flex items-center px-1 text-sm relative',
-                      isSelected && 'ring-2 ring-[#0564d2] ring-inset z-10',
-                      cell.style?.bold && 'font-bold',
-                      cell.style?.italic && 'italic',
-                      cell.style?.underline && 'underline',
-                      cell.style?.align === 'center' && 'text-center justify-center',
-                      cell.style?.align === 'right' && 'text-right justify-end'
+                      "w-24 h-7 border-r border-b border-gray-200 flex items-center px-1 text-sm relative",
+                      isSelected && "ring-2 ring-[#0564d2] ring-inset z-10",
+                      cell.style?.bold && "font-bold",
+                      cell.style?.italic && "italic",
+                      cell.style?.underline && "underline",
+                      cell.style?.align === "center" &&
+                        "text-center justify-center",
+                      cell.style?.align === "right" && "text-right justify-end",
                     )}
                     style={{
                       backgroundColor: cell.style?.backgroundColor,
@@ -451,10 +669,10 @@ export function Spreadsheet({ fileId }: SpreadsheetProps) {
                         onChange={(e) => setEditValue(e.target.value)}
                         onBlur={handleEditSubmit}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleEditSubmit();
-                          if (e.key === 'Escape') {
+                          if (e.key === "Enter") handleEditSubmit();
+                          if (e.key === "Escape") {
                             setEditingCell(null);
-                            setEditValue('');
+                            setEditValue("");
                           }
                         }}
                         className="absolute inset-0 w-full h-full px-1 border-none outline-none bg-white"
@@ -472,11 +690,7 @@ export function Spreadsheet({ fileId }: SpreadsheetProps) {
 
       {/* Status Bar */}
       <div className="flex items-center justify-between px-4 py-1 border-t border-gray-200 bg-gray-50 text-xs text-gray-500">
-        <span>
-          {selectedCell
-            ? `Cell: ${selectedCell}`
-            : 'No selection'}
-        </span>
+        <span>{selectedCell ? `Cell: ${selectedCell}` : "No selection"}</span>
         <span>
           {data.rowCount} rows × {data.colCount} columns
         </span>

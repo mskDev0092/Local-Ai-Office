@@ -1,12 +1,12 @@
-import { useEffect, useCallback, useState } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
-import Underline from '@tiptap/extension-underline';
-import TextAlign from '@tiptap/extension-text-align';
-import Highlight from '@tiptap/extension-highlight';
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import { common, createLowlight } from 'lowlight';
+import { useEffect, useCallback, useState } from "react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Placeholder from "@tiptap/extension-placeholder";
+import Underline from "@tiptap/extension-underline";
+import TextAlign from "@tiptap/extension-text-align";
+import Highlight from "@tiptap/extension-highlight";
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import { common, createLowlight } from "lowlight";
 import {
   Bold,
   Italic,
@@ -30,19 +30,20 @@ import {
   Type,
   Check,
   X,
-} from 'lucide-react';
-import { useAppStore } from '@/store/appStore';
-import { Button } from '@/components/ui/button';
-import { Toggle } from '@/components/ui/toggle';
-import { Separator } from '@/components/ui/separator';
-import { cn } from '@/lib/utils';
+  MessageSquare,
+} from "lucide-react";
+import { useAppStore } from "@/store/appStore";
+import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { AIService } from '@/services/aiService';
+} from "@/components/ui/dropdown-menu";
+import { AIService } from "@/services/aiService";
 
 const lowlight = createLowlight(common);
 
@@ -51,10 +52,17 @@ interface RichTextEditorProps {
 }
 
 export function RichTextEditor({ fileId }: RichTextEditorProps) {
-  const { documents, updateDocument, aiConfig, addChatMessage } = useAppStore();
+  const {
+    documents,
+    updateDocument,
+    aiConfig,
+    addChatMessage,
+    aiPanelOpen,
+    setAIPanelOpen,
+  } = useAppStore();
   const [isProcessing, setIsProcessing] = useState(false);
   const [showAIInput, setShowAIInput] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiPrompt, setAiPrompt] = useState("");
 
   const document = documents[fileId];
 
@@ -64,18 +72,18 @@ export function RichTextEditor({ fileId }: RichTextEditorProps) {
         codeBlock: false,
       }),
       Placeholder.configure({
-        placeholder: 'Start typing or use AI to help you write...',
+        placeholder: "Start typing or use AI to help you write...",
       }),
       Underline,
       TextAlign.configure({
-        types: ['heading', 'paragraph'],
+        types: ["heading", "paragraph"],
       }),
       Highlight,
       CodeBlockLowlight.configure({
         lowlight,
       }),
     ],
-    content: document?.content || '<p></p>',
+    content: document?.content || "<p></p>",
     onUpdate: ({ editor }) => {
       updateDocument(fileId, editor.getHTML());
     },
@@ -87,58 +95,65 @@ export function RichTextEditor({ fileId }: RichTextEditorProps) {
     }
   }, [fileId, editor, document?.content]);
 
-  const handleAIAction = useCallback(async (action: string, instruction?: string) => {
-    if (!editor || !aiConfig.isConnected) return;
+  const handleAIAction = useCallback(
+    async (action: string, instruction?: string) => {
+      if (!editor || !aiConfig.isConnected) return;
 
-    const { from, to } = editor.state.selection;
-    const selectedText = editor.state.doc.textBetween(from, to, ' ');
+      const { from, to } = editor.state.selection;
+      const selectedText = editor.state.doc.textBetween(from, to, " ");
 
-    if (!selectedText && action !== 'write') {
-      addChatMessage({
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: 'Please select some text first to use this AI feature.',
-        timestamp: Date.now(),
-      });
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      const aiService = new AIService(aiConfig);
-      const request = aiService.buildWritingPrompt(action, selectedText, instruction);
-      const result = await aiService.processRequest(request);
-
-      if (action === 'write') {
-        editor.chain().focus().insertContent(result).run();
-      } else {
-        editor.chain().focus().deleteSelection().insertContent(result).run();
+      if (!selectedText && action !== "write") {
+        addChatMessage({
+          id: Date.now().toString(),
+          role: "assistant",
+          content: "Please select some text first to use this AI feature.",
+          timestamp: Date.now(),
+        });
+        return;
       }
 
-      addChatMessage({
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: `AI ${action} completed successfully.`,
-        timestamp: Date.now(),
-      });
-    } catch (error) {
-      addChatMessage({
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: `Error: ${error instanceof Error ? error.message : 'Failed to process request'}`,
-        timestamp: Date.now(),
-      });
-    } finally {
-      setIsProcessing(false);
-      setShowAIInput(false);
-      setAiPrompt('');
-    }
-  }, [editor, aiConfig, addChatMessage]);
+      setIsProcessing(true);
+
+      try {
+        const aiService = new AIService(aiConfig);
+        const request = aiService.buildWritingPrompt(
+          action,
+          selectedText,
+          instruction,
+        );
+        const result = await aiService.processRequest(request);
+
+        if (action === "write") {
+          editor.chain().focus().insertContent(result).run();
+        } else {
+          editor.chain().focus().deleteSelection().insertContent(result).run();
+        }
+
+        addChatMessage({
+          id: Date.now().toString(),
+          role: "assistant",
+          content: `AI ${action} completed successfully.`,
+          timestamp: Date.now(),
+        });
+      } catch (error) {
+        addChatMessage({
+          id: Date.now().toString(),
+          role: "assistant",
+          content: `Error: ${error instanceof Error ? error.message : "Failed to process request"}`,
+          timestamp: Date.now(),
+        });
+      } finally {
+        setIsProcessing(false);
+        setShowAIInput(false);
+        setAiPrompt("");
+      }
+    },
+    [editor, aiConfig, addChatMessage],
+  );
 
   const handleCustomAIPrompt = useCallback(async () => {
     if (!aiPrompt.trim()) return;
-    await handleAIAction('custom', aiPrompt);
+    await handleAIAction("custom", aiPrompt);
   }, [aiPrompt, handleAIAction]);
 
   if (!editor) {
@@ -160,7 +175,7 @@ export function RichTextEditor({ fileId }: RichTextEditorProps) {
       pressed={isActive}
       onPressedChange={onClick}
       className={cn(
-        'h-8 w-8 p-0 data-[state=on]:bg-[#0564d2]/10 data-[state=on]:text-[#0564d2]'
+        "h-8 w-8 p-0 data-[state=on]:bg-[#0564d2]/10 data-[state=on]:text-[#0564d2]",
       )}
       title={title}
     >
@@ -192,25 +207,25 @@ export function RichTextEditor({ fileId }: RichTextEditorProps) {
         <div className="flex items-center gap-0.5">
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBold().run()}
-            isActive={editor.isActive('bold')}
+            isActive={editor.isActive("bold")}
             icon={Bold}
             title="Bold"
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleItalic().run()}
-            isActive={editor.isActive('italic')}
+            isActive={editor.isActive("italic")}
             icon={Italic}
             title="Italic"
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleUnderline().run()}
-            isActive={editor.isActive('underline')}
+            isActive={editor.isActive("underline")}
             icon={UnderlineIcon}
             title="Underline"
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleStrike().run()}
-            isActive={editor.isActive('strike')}
+            isActive={editor.isActive("strike")}
             icon={Strikethrough}
             title="Strikethrough"
           />
@@ -221,20 +236,26 @@ export function RichTextEditor({ fileId }: RichTextEditorProps) {
         {/* Headings */}
         <div className="flex items-center gap-0.5">
           <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            isActive={editor.isActive('heading', { level: 1 })}
+            onClick={() =>
+              editor.chain().focus().toggleHeading({ level: 1 }).run()
+            }
+            isActive={editor.isActive("heading", { level: 1 })}
             icon={Heading1}
             title="Heading 1"
           />
           <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            isActive={editor.isActive('heading', { level: 2 })}
+            onClick={() =>
+              editor.chain().focus().toggleHeading({ level: 2 }).run()
+            }
+            isActive={editor.isActive("heading", { level: 2 })}
             icon={Heading2}
             title="Heading 2"
           />
           <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-            isActive={editor.isActive('heading', { level: 3 })}
+            onClick={() =>
+              editor.chain().focus().toggleHeading({ level: 3 }).run()
+            }
+            isActive={editor.isActive("heading", { level: 3 })}
             icon={Heading3}
             title="Heading 3"
           />
@@ -246,13 +267,13 @@ export function RichTextEditor({ fileId }: RichTextEditorProps) {
         <div className="flex items-center gap-0.5">
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBulletList().run()}
-            isActive={editor.isActive('bulletList')}
+            isActive={editor.isActive("bulletList")}
             icon={List}
             title="Bullet List"
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            isActive={editor.isActive('orderedList')}
+            isActive={editor.isActive("orderedList")}
             icon={ListOrdered}
             title="Numbered List"
           />
@@ -263,20 +284,20 @@ export function RichTextEditor({ fileId }: RichTextEditorProps) {
         {/* Alignment */}
         <div className="flex items-center gap-0.5">
           <ToolbarButton
-            onClick={() => editor.chain().focus().setTextAlign('left').run()}
-            isActive={editor.isActive({ textAlign: 'left' })}
+            onClick={() => editor.chain().focus().setTextAlign("left").run()}
+            isActive={editor.isActive({ textAlign: "left" })}
             icon={AlignLeft}
             title="Align Left"
           />
           <ToolbarButton
-            onClick={() => editor.chain().focus().setTextAlign('center').run()}
-            isActive={editor.isActive({ textAlign: 'center' })}
+            onClick={() => editor.chain().focus().setTextAlign("center").run()}
+            isActive={editor.isActive({ textAlign: "center" })}
             icon={AlignCenter}
             title="Align Center"
           />
           <ToolbarButton
-            onClick={() => editor.chain().focus().setTextAlign('right').run()}
-            isActive={editor.isActive({ textAlign: 'right' })}
+            onClick={() => editor.chain().focus().setTextAlign("right").run()}
+            isActive={editor.isActive({ textAlign: "right" })}
             icon={AlignRight}
             title="Align Right"
           />
@@ -288,19 +309,19 @@ export function RichTextEditor({ fileId }: RichTextEditorProps) {
         <div className="flex items-center gap-0.5">
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            isActive={editor.isActive('blockquote')}
+            isActive={editor.isActive("blockquote")}
             icon={Quote}
             title="Quote"
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-            isActive={editor.isActive('codeBlock')}
+            isActive={editor.isActive("codeBlock")}
             icon={Code}
             title="Code Block"
           />
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleHighlight().run()}
-            isActive={editor.isActive('highlight')}
+            isActive={editor.isActive("highlight")}
             icon={Highlighter}
             title="Highlight"
           />
@@ -310,57 +331,75 @@ export function RichTextEditor({ fileId }: RichTextEditorProps) {
 
         {/* AI Actions */}
         {aiConfig.isConnected && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-2 text-[#0564d2] hover:bg-[#0564d2]/10"
-                disabled={isProcessing}
-              >
-                <Sparkles className="w-4 h-4" />
-                AI
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => handleAIAction('write')}>
-                <Wand2 className="w-4 h-4 mr-2" />
-                Write with AI
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAIAction('improve')}>
-                <Type className="w-4 h-4 mr-2" />
-                Improve Writing
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAIAction('shorten')}>
-                <span className="w-4 h-4 mr-2 text-sm font-bold">--</span>
-                Make Shorter
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAIAction('lengthen')}>
-                <span className="w-4 h-4 mr-2 text-sm font-bold">++</span>
-                Make Longer
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAIAction('formal')}>
-                <span className="w-4 h-4 mr-2 text-sm">🎩</span>
-                More Formal
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAIAction('casual')}>
-                <span className="w-4 h-4 mr-2 text-sm">😊</span>
-                More Casual
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAIAction('fix')}>
-                <Check className="w-4 h-4 mr-2" />
-                Fix Grammar
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAIAction('summarize')}>
-                <span className="w-4 h-4 mr-2 text-sm">∑</span>
-                Summarize
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAIAction('bullet')}>
-                <List className="w-4 h-4 mr-2" />
-                Convert to Bullets
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-2 text-[#0564d2] hover:bg-[#0564d2]/10"
+                  disabled={isProcessing}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  AI
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => handleAIAction("write")}>
+                  <Wand2 className="w-4 h-4 mr-2" />
+                  Write with AI
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleAIAction("improve")}>
+                  <Type className="w-4 h-4 mr-2" />
+                  Improve Writing
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleAIAction("shorten")}>
+                  <span className="w-4 h-4 mr-2 text-sm font-bold">--</span>
+                  Make Shorter
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleAIAction("lengthen")}>
+                  <span className="w-4 h-4 mr-2 text-sm font-bold">++</span>
+                  Make Longer
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleAIAction("formal")}>
+                  <span className="w-4 h-4 mr-2 text-sm">🎩</span>
+                  More Formal
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleAIAction("casual")}>
+                  <span className="w-4 h-4 mr-2 text-sm">😊</span>
+                  More Casual
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleAIAction("fix")}>
+                  <Check className="w-4 h-4 mr-2" />
+                  Fix Grammar
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleAIAction("summarize")}>
+                  <span className="w-4 h-4 mr-2 text-sm">∑</span>
+                  Summarize
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleAIAction("bullet")}>
+                  <List className="w-4 h-4 mr-2" />
+                  Convert to Bullets
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "gap-2",
+                aiPanelOpen
+                  ? "text-[#0564d2] bg-[#0564d2]/10"
+                  : "text-gray-600 hover:text-[#0564d2] hover:bg-[#0564d2]/10",
+              )}
+              onClick={() => setAIPanelOpen(!aiPanelOpen)}
+              title={aiPanelOpen ? "Close AI chat" : "Open AI chat"}
+            >
+              <MessageSquare className="w-4 h-4" />
+              Chat
+            </Button>
+          </>
         )}
       </div>
 
@@ -374,10 +413,10 @@ export function RichTextEditor({ fileId }: RichTextEditorProps) {
             placeholder="Tell AI what to do with the selected text..."
             className="flex-1 bg-transparent border-none outline-none text-sm"
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleCustomAIPrompt();
-              if (e.key === 'Escape') {
+              if (e.key === "Enter") handleCustomAIPrompt();
+              if (e.key === "Escape") {
                 setShowAIInput(false);
-                setAiPrompt('');
+                setAiPrompt("");
               }
             }}
             autoFocus
@@ -388,14 +427,14 @@ export function RichTextEditor({ fileId }: RichTextEditorProps) {
             onClick={handleCustomAIPrompt}
             disabled={!aiPrompt.trim() || isProcessing}
           >
-            {isProcessing ? '...' : 'Go'}
+            {isProcessing ? "..." : "Go"}
           </Button>
           <Button
             size="sm"
             variant="ghost"
             onClick={() => {
               setShowAIInput(false);
-              setAiPrompt('');
+              setAiPrompt("");
             }}
           >
             <X className="w-4 h-4" />
